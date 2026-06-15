@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src https://api.github.com; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'; upgrade-insecure-requests"
+    />
+    <meta name="referrer" content="no-referrer" />
+    <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=(), usb=()" />
+    <title>Excel PDF Batch Converter</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="page-shell">
+      <header class="app-header">
+        <div>
+          <p class="eyebrow">GitHub Actions powered</p>
+          <h1>Excel一括PDF変換</h1>
+          <p class="lead">
+            複数の .xlsx ファイルをアップロードし、指定範囲を削除してからPDFへ変換します。
+            変換処理はGitHub Actions上で実行されます。
+          </p>
+        </div>
+      </header>
+
+      <section class="step-card" id="step-files">
+        <div class="step-heading">
+          <span class="step-badge" data-step-status="files">1</span>
+          <div>
+            <h2>ファイルを選択</h2>
+            <p>.xlsx ファイルを複数選択できます。ドラッグ&ドロップにも対応しています。</p>
+          </div>
+        </div>
+
+        <label class="drop-zone" id="dropZone">
+          <input id="fileInput" type="file" accept=".xlsx" multiple />
+          <span class="drop-title">ここに .xlsx ファイルをドラッグ</span>
+          <span class="drop-subtitle">またはクリックして選択 / 対応形式: .xlsx</span>
+        </label>
+
+        <div class="file-list-panel">
+          <div class="panel-title-row">
+            <h3>選択済みファイル</h3>
+            <span id="fileCount">0件</span>
+          </div>
+          <ul class="file-list" id="fileList"></ul>
+        </div>
+      </section>
+
+      <section class="step-card" id="step-rules">
+        <div class="step-heading">
+          <span class="step-badge" data-step-status="rules">2</span>
+          <div>
+            <h2>削除範囲を指定</h2>
+            <p>共通設定とファイル別設定を組み合わせられます。範囲は A1:C10、5:10、A:C の形式で入力します。</p>
+          </div>
+        </div>
+
+        <div class="tabs" role="tablist" aria-label="削除設定">
+          <button class="tab-button active" type="button" data-tab="common">全ファイル共通設定</button>
+          <button class="tab-button" type="button" data-tab="per-file">ファイル別設定</button>
+        </div>
+
+        <div class="tab-panel active" id="commonPanel">
+          <div class="rule-table" id="commonRules"></div>
+          <button class="secondary-button" type="button" id="addCommonRule">+ ルールを追加</button>
+        </div>
+
+        <div class="tab-panel" id="perFilePanel">
+          <div class="per-file-layout">
+            <aside class="file-selector">
+              <h3>対象ファイル</h3>
+              <div id="perFileSelector" class="file-selector-list"></div>
+            </aside>
+            <div class="file-rule-panel">
+              <div class="panel-title-row">
+                <h3 id="activeFileTitle">ファイルを選択してください</h3>
+              </div>
+              <div class="rule-table" id="fileRules"></div>
+              <button class="secondary-button" type="button" id="addFileRule">+ ルールを追加</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="step-card" id="step-run">
+        <div class="step-heading">
+          <span class="step-badge" data-step-status="run">3</span>
+          <div>
+            <h2>変換を実行</h2>
+            <p>GitHub APIで一時ブランチへファイルをアップロードし、Actionsで変換します。</p>
+          </div>
+        </div>
+
+        <div class="github-settings">
+          <label>
+            GitHub owner
+            <input id="ownerInput" type="text" placeholder="例: your-org" autocomplete="off" />
+          </label>
+          <label>
+            Repository
+            <input id="repoInput" type="text" placeholder="例: excel-pdf-tool" autocomplete="off" />
+          </label>
+          <label>
+            Fine-grained PAT
+            <input id="tokenInput" type="password" placeholder="ブラウザ内メモリでのみ使用" autocomplete="off" />
+          </label>
+        </div>
+
+        <button class="primary-button" type="button" id="runButton">変換実行</button>
+
+        <div class="progress-wrap" aria-live="polite">
+          <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+          </div>
+          <span id="progressText">未実行</span>
+        </div>
+
+        <div class="log-panel">
+          <div class="panel-title-row">
+            <h3>ログ</h3>
+            <button class="text-button" type="button" id="clearLogs">クリア</button>
+          </div>
+          <ol id="logList" class="log-list"></ol>
+        </div>
+
+        <a class="download-button hidden" id="downloadLink" href="#" download>PDFをZIPでダウンロード</a>
+      </section>
+    </main>
+
+    <template id="ruleRowTemplate">
+      <div class="rule-row">
+        <label>
+          シート名
+          <input class="rule-sheet" type="text" placeholder="Sheet1" />
+        </label>
+        <label>
+          範囲
+          <input class="rule-range" type="text" placeholder="A1:C10 / 5:10 / A:C" />
+        </label>
+        <label>
+          削除方法
+          <select class="rule-mode">
+            <option value="clear_values">値のみクリア</option>
+            <option value="delete_rows">行ごと物理削除</option>
+            <option value="delete_columns">列ごと物理削除</option>
+          </select>
+        </label>
+        <button class="icon-button delete-rule" type="button" aria-label="このルールを削除">🗑</button>
+        <p class="validation-message"></p>
+      </div>
+    </template>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

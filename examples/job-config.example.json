@@ -1,0 +1,26 @@
+{
+  "jobId": "20260615123000",
+  "createdAt": "2026-06-15T12:30:00.000Z",
+  "files": ["sample.xlsx"],
+  "commonRules": [
+    {
+      "sheet": "Sheet1",
+      "range": "A1:C10",
+      "mode": "clear_values"
+    }
+  ],
+  "fileRules": {
+    "sample.xlsx": [
+      {
+        "sheet": "Sheet2",
+        "range": "5:10",
+        "mode": "delete_rows"
+      },
+      {
+        "sheet": "Sheet3",
+        "range": "A:C",
+        "mode": "delete_columns"
+      }
+    ]
+  }
+}

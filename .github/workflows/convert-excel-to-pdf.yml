@@ -1,0 +1,70 @@
+name: Convert Excel to PDF
+
+on:
+  workflow_dispatch:
+    inputs:
+      job_id:
+        description: Job ID created by the GitHub Pages app
+        required: true
+        type: string
+      upload_branch:
+        description: Temporary branch containing uploaded Excel files
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout uploaded job branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.upload_branch }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install LibreOffice
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libreoffice
+
+      - name: Install Python dependencies
+        run: pip install -r scripts/requirements.txt
+
+      - name: Convert Excel files
+        run: |
+          python scripts/convert_excel_to_pdf.py \
+            --job-dir "jobs/${{ inputs.job_id }}" \
+            --output-dir "work/${{ inputs.job_id }}" \
+            --zip-path "work/${{ inputs.job_id }}/pdf-output.zip"
+
+      - name: Upload conversion output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: converted-pdf-zip
+          path: |
+            work/${{ inputs.job_id }}/pdf/*.pdf
+            work/${{ inputs.job_id }}/conversion-report.json
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Cleanup temporary upload branch
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UPLOAD_BRANCH: ${{ inputs.upload_branch }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          gh api \
+            --method DELETE \
+            "repos/${REPOSITORY}/git/refs/heads/${UPLOAD_BRANCH}" || true
