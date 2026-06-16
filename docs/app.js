@@ -534,7 +534,11 @@ async function runConversion() {
   } catch (error) {
     console.error(error);
     setProgress(0, "エラー");
-    addLog(error.message, "error");
+    const message =
+      error instanceof TypeError && error.message === "Failed to fetch"
+        ? "GitHub APIまたは成果物ZIPの取得に失敗しました。ページを再読み込みして再実行してください。問題が続く場合はPAT権限とブラウザの通信制限を確認してください。"
+        : error.message;
+    addLog(message, "error");
   } finally {
     els.tokenInput.value = "";
     els.runButton.disabled = false;
